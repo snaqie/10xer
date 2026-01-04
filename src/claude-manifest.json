@@ -14,12 +14,12 @@
       "args": [
         "${__dirname}/src/universal-server.js",
         "10xer MCP Server",
-        "https://10xer-production.up.railway.app/mcp",
+        "https://facebook-ads-mcp-btfuv.ondigitalocean.app/mcp",
         "${user_config.organization_id}"
       ],
       "env": {
         "SERVER_NAME": "10xer MCP Server",
-        "SSE_URL": "https://10xer-production.up.railway.app/mcp",
+        "SSE_URL": "https://facebook-ads-mcp-btfuv.ondigitalocean.app/mcp",
         "ORGANIZATION_ID": "${user_config.organization_id}"
       }
     }

@@ -51,7 +51,7 @@ class UniversalFacebookAdsServer {
   constructor() {
     this.adapters = {
       mcp: new MCPAdapter(),
-      openai: new OpenAIAdapter(), 
+      openai: new OpenAIAdapter(),
       gemini: new GeminiAdapter(),
       facebookAccessToken: null,
       user_id: null,
@@ -80,7 +80,8 @@ class UniversalFacebookAdsServer {
   }
 
   async fetchLatestFacebookAccessToken(sessionCookie) {
-    const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user`;
+    const deployedUrl = process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app';
+    const url = `${deployedUrl}/mcp-api/facebook_token_by_user`;
     try {
       const res = await fetch(url, {
         method: 'GET',
@@ -117,7 +118,8 @@ class UniversalFacebookAdsServer {
 
     // Try to fetch user-specific token from external API
     if (userId) {
-      const url = `https://10xer-web-production.up.railway.app/mcp-api/facebook_token_by_user?userId=${userId}`;
+      const deployedUrl = process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app';
+      const url = `${deployedUrl}/mcp-api/facebook_token_by_user?userId=${userId}`;
       try {
         const res = await fetch(url);
 
@@ -709,7 +711,7 @@ class UniversalFacebookAdsServer {
     this.apiServer.get('/mcp/start-auth/', (req, res) => {
       // For now, indicate that authentication is handled via tools
       res.json({
-        auth_url: `${process.env.DEPLOYED_URL || 'https://10xer-production.up.railway.app'}/auth/facebook`,
+        auth_url: `${process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app'}/auth/facebook`,
         type: "oauth2"
       });
     });
@@ -803,10 +805,10 @@ class UniversalFacebookAdsServer {
             <div class="emoji">🔐</div>
             <h1>Facebook Login Required</h1>
             <p>
-              Step 1: <a href="https://10xer-web-production.up.railway.app/login" target="_blank" rel="noopener noreferrer">Login to 10xer</a>
+              Step 1: <a href="/login" target="_blank" rel="noopener noreferrer">Login to 10xer</a>
             </p>
             <p>
-              Step 2: <a href="https://10xer-web-production.up.railway.app/integrations/integrations" target="_blank" rel="noopener noreferrer">Visit the Integrations Page</a>
+              Step 2: <a href="/integrations/integrations" target="_blank" rel="noopener noreferrer">Visit the Integrations Page</a>
             </p>
             <p>Once logged in, click the button below to continue:</p>
             <form method="GET" action="/trigger-token-fetch">
@@ -934,7 +936,8 @@ class UniversalFacebookAdsServer {
         }
 
         // Send POST to Flask backend with extra info
-        const response = await fetch('https://10xer-web-production.up.railway.app/mcp-api/save_user_session', {
+        const deployedUrl = process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app';
+        const response = await fetch(`${deployedUrl}/mcp-api/save_user_session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -999,8 +1002,8 @@ class UniversalFacebookAdsServer {
       }
     });
 
-    this.apiServer.get("/getSession", async(req, res) => {
-      res.json({cookie: req.headers.cookie})
+    this.apiServer.get("/getSession", async (req, res) => {
+      res.json({ cookie: req.headers.cookie })
     })
 
     // this.apiServer.get('/save-trigger-token-fetch', (req, res) => {
@@ -1387,7 +1390,8 @@ class UniversalFacebookAdsServer {
     }
 
     // Use organizationId in fallback URL
-    const fallbackUrl = `https://10xer-web-production.up.railway.app/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
+    const deployedUrl = process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app';
+    const fallbackUrl = `${deployedUrl}/mcp-api/get_latest_session_by_org_id?organization_id=${organizationId}`;
     console.log(`🌐 Fetching fallback session from: ${fallbackUrl}`);
 
     const fallbackRes = await fetch(fallbackUrl);
@@ -1407,7 +1411,7 @@ class UniversalFacebookAdsServer {
   async executeToolCall({ toolName, args }) {
     console.error("args->", args)
     // console.error("args?.user_id->", args?.user_id)
-    
+
     // Only fetch Facebook token for tools that need it (not auth tools)
     // const authTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
     // if (!authTools.includes(toolName)) {
@@ -1442,7 +1446,7 @@ class UniversalFacebookAdsServer {
     console.log("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     // }
 
-    
+
     // Step 2: tool switch
     switch (toolName) {
       // case 'facebook_login':
@@ -1453,7 +1457,7 @@ class UniversalFacebookAdsServer {
 
       // case 'facebook_check_auth':
       //   return await facebookCheckAuth(args);
-      
+
       case 'facebook_list_ad_accounts':
         return await listAdAccounts(args, this.currentFacebookAccessToken);
 
@@ -1561,7 +1565,7 @@ class UniversalFacebookAdsServer {
 
   async start() {
     const mode = process.env.SERVER_MODE || 'mcp';
-    
+
     if (mode === 'api') {
       const port = parseInt(process.env.PORT || '3003');
       this.startAPI(port);
