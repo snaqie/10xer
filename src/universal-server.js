@@ -35,6 +35,7 @@ import { getLocalIPv4 } from './utils/network.js';
 
 import { getClaudeSessionCookie } from "./utils/claudeCookies.js";
 import open from 'open';
+import { TokenStorage } from './auth/token-storage.js';
 
 import readline from 'readline';
 
@@ -109,14 +110,22 @@ class UniversalFacebookAdsServer {
   }
 
   async fetchFacebookAccessToken(userId) {
-    // For Claude.ai compatibility, use environment variable when no user auth available
-    if (!userId && process.env.FACEBOOK_ACCESS_TOKEN) {
+    // 1. Check environment variable (highest priority)
+    if (process.env.FACEBOOK_ACCESS_TOKEN) {
       this.currentFacebookAccessToken = process.env.FACEBOOK_ACCESS_TOKEN;
       console.error('✅ Using environment Facebook access token');
       return;
     }
 
-    // Try to fetch user-specific token from external API
+    // 2. Check local TokenStorage (second priority)
+    const localToken = await TokenStorage.getToken();
+    if (localToken) {
+      this.currentFacebookAccessToken = localToken;
+      console.error('✅ Using locally stored Facebook access token');
+      return;
+    }
+
+    // 3. Check digitalocean/external API (third priority)
     if (userId) {
       const deployedUrl = process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app';
       const url = `${deployedUrl}/mcp-api/facebook_token_by_user?userId=${userId}`;
@@ -147,7 +156,7 @@ class UniversalFacebookAdsServer {
       }
     }
 
-    throw new Error('No Facebook access token available');
+    throw new Error('No Facebook access token available. Please login at /facebook-auth-helper');
   }
 
   setupApiServer() {
@@ -728,6 +737,71 @@ class UniversalFacebookAdsServer {
     this.apiServer.get('/auth/facebook', (req, res) => {
       // For now, redirect to the auth helper page
       res.redirect('/facebook-auth-helper');
+    });
+
+    this.apiServer.get('/login', (req, res) => {
+      const baseUrl = 'https://www.facebook.com/v23.0/dialog/oauth';
+      const redirectUri = `${process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app'}/auth/callback`;
+      const state = Math.random().toString(36).substring(7);
+
+      const params = new URLSearchParams({
+        client_id: process.env.FACEBOOK_APP_ID,
+        redirect_uri: redirectUri,
+        scope: 'ads_read,ads_management,business_management',
+        response_type: 'code',
+        state: state
+      });
+
+      res.redirect(`${baseUrl}?${params}`);
+    });
+
+    this.apiServer.get('/auth/callback', async (req, res) => {
+      const { code, state, error } = req.query;
+
+      if (error) {
+        return res.status(400).send(`Auth error: ${error}`);
+      }
+
+      if (!code) {
+        return res.status(400).send('Missing code parameter');
+      }
+
+      try {
+        const tokenUrl = 'https://graph.facebook.com/v23.0/oauth/access_token';
+        const redirectUri = `${process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app'}/auth/callback`;
+
+        const params = new URLSearchParams({
+          client_id: process.env.FACEBOOK_APP_ID,
+          client_secret: process.env.FACEBOOK_APP_SECRET,
+          redirect_uri: redirectUri,
+          code: code
+        });
+
+        const response = await fetch(`${tokenUrl}?${params}`);
+        const data = await response.json();
+
+        if (data.access_token) {
+          // Store token
+          await TokenStorage.storeToken(data.access_token, data.expires_in);
+
+          res.send(`
+            <html>
+              <body style="font-family: sans-serif; text-align: center; padding: 50px;">
+                <h2 style="color: #27ae60;">✅ Successfully Connected!</h2>
+                <p>Your Facebook account has been linked successfully.</p>
+                <p>You can now close this window and continue using your MCP tools.</p>
+                <script>setTimeout(() => window.close(), 3000);</script>
+              </body>
+            </html>
+          `);
+        } else {
+          console.error('❌ Token exchange failed:', data);
+          res.status(400).json({ error: 'Token exchange failed', details: data });
+        }
+      } catch (err) {
+        console.error('❌ Callback error:', err);
+        res.status(500).send(`Error: ${err.message}`);
+      }
     });
 
     this.apiServer.get('/facebook-auth-helper', (req, res) => {
