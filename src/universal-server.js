@@ -80,34 +80,7 @@ class UniversalFacebookAdsServer {
     this.setupMCPHandlers();
   }
 
-  async fetchLatestFacebookAccessToken(sessionCookie) {
-    const deployedUrl = process.env.DEPLOYED_URL || 'https://facebook-ads-mcp-btfuv.ondigitalocean.app';
-    const url = `${deployedUrl}/mcp-api/facebook_token_by_user`;
-    try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Cookie': sessionCookie, // Important: must be in format "session=xyz"
-          'Content-Type': 'application/json' // optional for GET, but clean to include
-        }
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch Facebook token: ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.success && data.facebook_access_token) {
-        this.currentFacebookAccessToken = data.facebook_access_token;
-        console.error('✅ Facebook access token fetched:', this.currentFacebookAccessToken.slice(0, 10) + '...');
-      } else {
-        throw new Error('Token not present in response');
-      }
-    } catch (err) {
-      console.error('❌ Error fetching Facebook token:', err.message);
-      throw err;
-    }
-  }
+  // Redundant method removed. fetchFacebookAccessToken is now the consolidated way.
 
   async fetchFacebookAccessToken(userId) {
     // 1. Check environment variable (highest priority)
@@ -1499,32 +1472,22 @@ class UniversalFacebookAdsServer {
     //   console.error("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
     // }
 
-    let user_id;
-    // Tools that don't require org/user ID or Facebook token
-    // const authExemptTools = ['facebook_login', 'facebook_logout', 'facebook_check_auth'];
+    const organizationId = args.organization_id;
+    let userId = null;
 
-    // if (!authExemptTools.includes(toolName)) {
-    let organizationId = args.organization_id;
-
-    if (!organizationId) {
-      // Prompt user via chat to enter org ID
-      organizationId = await this.askOrganizationId();
-      if (!organizationId) {
-        throw new Error("❌ Organization ID is required but was not provided.");
-      }
+    if (organizationId) {
+      // Resolve user ID with organization ID provided
+      userId = await this.resolveUserIdFromSessionOrOrg(
+        this.sessionUserMap,
+        this.activeSseTransport?.sessionId,
+        organizationId
+      );
     }
 
-    // Resolve user ID with organization ID provided
-    const userId = await this.resolveUserIdFromSessionOrOrg(
-      this.sessionUserMap,
-      this.activeSseTransport?.sessionId,
-      organizationId
-    );
-
-    // Fetch Facebook token for resolved user
-    await this.fetchLatestFacebookAccessToken(userId);
-    console.log("this.currentFacebookAccessToken->", this.currentFacebookAccessToken);
-    // }
+    // Consolidated token fetching (checks ENV, then TokenStorage, then external API if userId exists)
+    await this.fetchFacebookAccessToken(userId);
+    console.log("this.currentFacebookAccessToken (partial)->",
+      this.currentFacebookAccessToken ? this.currentFacebookAccessToken.slice(0, 5) + "..." : "null");
 
 
     // Step 2: tool switch
