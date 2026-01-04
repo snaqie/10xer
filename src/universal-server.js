@@ -879,19 +879,25 @@ class UniversalFacebookAdsServer {
             <div class="emoji">🔐</div>
             <h1>Facebook Login Required</h1>
             <p>
-              Step 1: <a href="/login" target="_blank" rel="noopener noreferrer">Login to 10xer</a>
-            </p>
             <p>
-              Step 2: <a href="/integrations/integrations" target="_blank" rel="noopener noreferrer">Visit the Integrations Page</a>
+              Step 1: <a href="/login" target="_blank" rel="noopener noreferrer">Login to Facebook</a>
             </p>
-            <p>Once logged in, click the button below to continue:</p>
-            <form method="GET" action="/trigger-token-fetch">
-              <button type="submit">✅ I'm Logged In – Continue</button>
+            <p>Once you see the "Successfully Connected" message, you are ready!</p>
+            <form method="GET" action="/health">
+              <button type="submit">✅ Check Connection Status</button>
             </form>
           </main>
         </body>
         </html>
       `);
+    });
+
+    this.apiServer.get('/integrations/integrations', (req, res) => {
+      res.send('<h2>This page is managed by the main application. Please use the /login route for direct MCP authentication.</h2>');
+    });
+
+    this.apiServer.get('/trigger-token-fetch', (req, res) => {
+      res.redirect('/health');
     });
 
     // this.apiServer.get('/trigger-token-fetch', async (req, res) => {
